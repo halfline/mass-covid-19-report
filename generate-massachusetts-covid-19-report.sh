@@ -55,9 +55,9 @@ SEQ_END=$((NUM_DAYS - 1))
 for i in $(seq ${SEQ_START} ${SEQ_END}); do
     DATE=$(get_date ${i})
     PDF_FILE=${DATE}.pdf
-    [ ! -e ${PDF_FILE} ] && curl https://www.mass.gov/doc/covid-19-cases-in-massachusetts-as-of-${DATE}/download > ${PDF_FILE}
+    [ ! -e ${PDF_FILE} ] && curl -s https://www.mass.gov/doc/covid-19-cases-in-massachusetts-as-of-${DATE}/download > ${PDF_FILE}
 
-    [ ! -e ${PDF_FILE} ] && curl https://www.mass.gov/doc/covid-19-cases-in-massachusetts-as-of-${DATA}-x-updated4pm/download > ${PDF_FILE}
+    [ ! -e ${PDF_FILE} ] && curl -s https://www.mass.gov/doc/covid-19-cases-in-massachusetts-as-of-${DATA}-x-updated4pm/download > ${PDF_FILE}
 
     if ! grep -q /Root ${PDF_FILE}; then
         rm -f ${PDF_FILE}
