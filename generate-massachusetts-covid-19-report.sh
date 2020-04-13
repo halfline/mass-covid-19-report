@@ -120,6 +120,9 @@ for i in $(seq ${SEQ_START} ${SEQ_END}); do
     # if this is the first time through the loop, we're just trying to get base line stats, not
     # print anything.
     if [ "$i" -lt $((SEQ_START + PREROLL)) ]; then
+        START_TOTAL_POSITIVE=${NEW_TOTAL_POSITIVE}
+        START_TOTAL_TESTS=${NEW_TOTAL_TESTS}
+        START_TOTAL_DEATHS=${NEW_TOTAL_DEATHS}
         OLD_TOTAL_POSITIVE=${NEW_TOTAL_POSITIVE}
         OLD_TOTAL_TESTS=${NEW_TOTAL_TESTS}
         OLD_TOTAL_DEATHS=${NEW_TOTAL_DEATHS}
@@ -163,6 +166,11 @@ for i in $(seq ${SEQ_START} ${SEQ_END}); do
     OLD_TOTAL_DEATHS=${NEW_TOTAL_DEATHS}
 done
 
+CASES_PER_DAY=$(((NEW_TOTAL_POSITIVE - START_TOTAL_POSITIVE)/NUM_DAYS))
+TESTS_PER_DAY=$(((NEW_TOTAL_TESTS - START_TOTAL_TESTS)/NUM_DAYS))
+DEATHS_PER_DAY=$(((NEW_TOTAL_DEATHS - START_TOTAL_DEATHS)/NUM_DAYS))
+
+echo -e "Over the last ${NUM_DAYS} days there have been an average of ${CASES_PER_DAY} cases per day, an average of ${TESTS_PER_DAY} tests per day, and an average of ${DEATHS_PER_DAY} deaths per day"
 
 for day in $(seq 1 5); do
     DATE=$(date -d "$day days ago" +%Y-%m-%d)
