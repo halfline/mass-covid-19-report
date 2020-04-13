@@ -1,6 +1,7 @@
 NUM_DAYS=7
 POPULATION=6892503
 ####
+PREROLL=1
 
 print_percentage()
 {
@@ -50,7 +51,7 @@ get_date()
 }
 
 SEQ_START=0
-SEQ_END=$((NUM_DAYS - 1))
+SEQ_END=$((NUM_DAYS - 1 + PREROLL))
 
 for i in $(seq ${SEQ_START} ${SEQ_END}); do
     DATE=$(get_date ${i})
@@ -111,14 +112,25 @@ for i in $(seq ${SEQ_START} ${SEQ_END}); do
     fi
 
     NEW_TOTAL_POSITIVE=$(cat ${TXT_FILE} |grep Confirmed | sed 's/[^0-9]*//g');
+    NEW_TOTAL_TESTS=$(cat ${TXT_FILE} |grep "^ *Total Patients Tested" | awk '{ print $5 }')
+    NEW_TOTAL_DEATHS=$(cat ${TXT_FILE} |grep "^ *Attributed to COVID-19" | awk '{ print $4 }')
+
     [ -z $NEW_TOTAL_POSITIVE ] && continue;
+
+    # if this is the first time through the loop, we're just trying to get base line stats, not
+    # print anything.
+    if [ "$i" -lt $((SEQ_START + PREROLL)) ]; then
+        OLD_TOTAL_POSITIVE=${NEW_TOTAL_POSITIVE}
+        OLD_TOTAL_TESTS=${NEW_TOTAL_TESTS}
+        OLD_TOTAL_DEATHS=${NEW_TOTAL_DEATHS}
+        continue;
+    fi
 
     echo -ne "$(date -d ${DATE} +'%d %B' ): ${NEW_TOTAL_POSITIVE} people infected"
     if [ -n "${OLD_TOTAL_POSITIVE}" ]; then
         echo -ne " ($(print_change 'cases' ${OLD_TOTAL_POSITIVE} ${NEW_TOTAL_POSITIVE}))"
     fi
 
-    NEW_TOTAL_TESTS=$(cat ${TXT_FILE} |grep "^ *Total Patients Tested" | awk '{ print $5 }')
     if [ -n "${NEW_TOTAL_TESTS}" ]; then
 
         echo -ne ",  ${NEW_TOTAL_TESTS} people tested"
@@ -135,7 +147,6 @@ for i in $(seq ${SEQ_START} ${SEQ_END}); do
         echo -ne " sampled ${POPULATION_PERCENTAGE} of the population"
     fi
 
-    NEW_TOTAL_DEATHS=$(cat ${TXT_FILE} |grep "^ *Attributed to COVID-19" | awk '{ print $4 }')
     if [ -n "${NEW_TOTAL_DEATHS}" ]; then
 
         echo -ne ", ${NEW_TOTAL_DEATHS} people died"
