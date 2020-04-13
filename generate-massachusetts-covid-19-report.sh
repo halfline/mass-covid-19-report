@@ -6,8 +6,23 @@ print_percentage()
 {
     old="$1"; shift
     new="$1"; shift
+    flags="$1"; shift
 
-    echo -ne $(python3 -c "print('%.2f' % ((${new} / ${old}) * 100))")
+    if echo "$flags" | fgrep -wq "only-show-difference"; then
+        ONLY_SHOW_DIFFERENCE=1
+    else
+        ONLY_SHOW_DIFFERENCE=0
+    fi
+
+    if [ "${ONLY_SHOW_DIFFERENCE}" != "0" ]; then
+        DELTA=$((new - old))
+        [ "${DELTA}" -gt 0 ] && echo -ne "+"
+
+        echo -ne $(python3 -c "print('%.2f' % ((${DELTA} / ${old}) * 100.0))")
+    else
+        echo -ne $(python3 -c "print('%.2f' % ((${new} / ${old}) * 100))")
+    fi
+
     echo -ne "%"
 }
 
@@ -24,7 +39,7 @@ print_change()
         return
     fi
 
-    echo -ne "up ${DELTA} ${object}, $(print_percentage ${old} ${new}) of prior day"
+    echo -ne "up ${DELTA} ${object}, $(print_percentage ${old} ${new} 'only-show-difference') from prior day"
 }
 
 get_date()
