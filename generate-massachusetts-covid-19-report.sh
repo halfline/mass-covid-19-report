@@ -36,11 +36,11 @@ print_change()
     DELTA=$((new - old))
 
     if [ ${new} -eq ${old} ]; then
-        echo -ne "no change from prior day"
+        echo -ne "no change from prior report"
         return
     fi
 
-    echo -ne "up ${DELTA} ${object}, $(print_percentage ${old} ${new} 'only-show-difference') from prior day"
+    echo -ne "up ${DELTA} ${object}, $(print_percentage ${old} ${new} 'only-show-difference') from prior report"
 }
 
 get_date()
@@ -114,6 +114,7 @@ for i in $(seq ${SEQ_START} ${SEQ_END}); do
     NEW_TOTAL_POSITIVE=$(cat ${TXT_FILE} |grep Confirmed | sed 's/[^0-9]*//g');
     NEW_TOTAL_TESTS=$(cat ${TXT_FILE} |grep "^ *Total Patients Tested" | awk '{ print $5 }')
     NEW_TOTAL_DEATHS=$(cat ${TXT_FILE} |grep "^ *Attributed to COVID-19" | awk '{ print $4 }')
+    NEW_DEATH_RANGE=$(cat ${TXT_FILE} | grep "Dates of Death" | awk -F: '{ print $2 }' | sed 's/)//')
 
     [ -z $NEW_TOTAL_POSITIVE ] && continue;
 
@@ -151,11 +152,23 @@ for i in $(seq ${SEQ_START} ${SEQ_END}); do
     fi
 
     if [ -n "${NEW_TOTAL_DEATHS}" ]; then
+        unset NEW_DEATH_RANGE_DAYS
+        if [ -n "${NEW_DEATH_RANGE}" ]; then
+            NEW_DEATH_RANGE_START=$(echo ${NEW_DEATH_RANGE} | awk '{ print $1 }')
+            NEW_DEATH_RANGE_END=$(echo ${NEW_DEATH_RANGE} | awk '{ print $3 }')
+            NEW_DEATH_RANGE_START_DATE=$(date -d $NEW_DEATH_RANGE_START +%s)
+            NEW_DEATH_RANGE_END_DATE=$(date -d $NEW_DEATH_RANGE_END +%s)
+            NEW_DEATH_RANGE_DAYS=$(((NEW_DEATH_RANGE_END_DATE - NEW_DEATH_RANGE_START_DATE) / (60 * 60 * 24)))
+        fi
 
         echo -ne ", ${NEW_TOTAL_DEATHS} people died"
 
         if [ -n "${OLD_TOTAL_DEATHS}" ]; then
             echo -ne " ($(print_change 'fatalities' ${OLD_TOTAL_DEATHS} ${NEW_TOTAL_DEATHS}))"
+        fi
+
+        if [ -n "${NEW_DEATH_RANGE_DAYS}" ]; then
+            echo -ne ", about $(((NEW_TOTAL_DEATHS - OLD_TOTAL_DEATHS) / NEW_DEATH_RANGE_DAYS)) deaths per day over the last ${NEW_DEATH_RANGE_DAYS} days."
         fi
     fi
     echo
@@ -168,9 +181,10 @@ done
 
 CASES_PER_DAY=$(((NEW_TOTAL_POSITIVE - START_TOTAL_POSITIVE)/NUM_DAYS))
 TESTS_PER_DAY=$(((NEW_TOTAL_TESTS - START_TOTAL_TESTS)/NUM_DAYS))
-DEATHS_PER_DAY=$(((NEW_TOTAL_DEATHS - START_TOTAL_DEATHS)/NUM_DAYS))
+DEATHS_PER_REPORT=$(((NEW_TOTAL_DEATHS - START_TOTAL_DEATHS)/NUM_DAYS))
 
-echo -e "Over the last ${NUM_DAYS} days there have been an average of ${CASES_PER_DAY} cases per day, an average of ${TESTS_PER_DAY} tests per day, and an average of ${DEATHS_PER_DAY} deaths per day"
+# FIXME: the deaths per day number here is just looking at the last report and not the $NUM_DAYS worth of reports
+echo -e "Over the last ${NUM_DAYS} days there have been an average of ${CASES_PER_DAY} cases per day, an average of ${TESTS_PER_DAY} tests per day, and an average of ${DEATHS_PER_REPORT} deaths per report (about $((DEATHS_PER_REPORT / NUM_DAYS)) per day)"
 
 for day in $(seq 1 5); do
     DATE=$(date -d "$day days ago" +%Y-%m-%d)
