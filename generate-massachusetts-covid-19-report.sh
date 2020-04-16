@@ -1,7 +1,8 @@
-NUM_DAYS=7
+DEFAULT_NUM_DAYS="7"
 POPULATION=6892503
 ####
 PREROLL=1
+NUM_DAYS="${1:-$DEFAULT_NUM_DAYS}"
 
 print_percentage()
 {
