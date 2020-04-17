@@ -51,6 +51,14 @@ get_date()
     date -d "$days_ago days ago" +%B-%e-%Y | tr 'A-Z' 'a-z' | tr -d ' '
 }
 
+record_name()
+{
+    field="$1"; shift
+    iteration="$1"; shift
+
+    echo "${field}-${iteration}"
+}
+
 SEQ_START=0
 SEQ_END=$((NUM_DAYS - 1 + PREROLL))
 
@@ -99,10 +107,22 @@ for i in $(seq ${SEQ_START} ${SEQ_END}); do
     fi
 done
 
-OLD_TOTAL_POSITIVE=
-OLD_TOTAL_TESTS=
-OLD_TOTAL_DEATHS=
+FIELDS=(total-positive total-tests total-deaths death-range death-range-span)
+
+declare -A DATA_STORE
+declare -A RECORD PRIOR_RECORD START_RECORD END_RECORD
+
+for FIELD in "${FIELDS[@]}"; do
+    START_RECORD[${FIELD}]="$(record_name ${FIELD} ${SEQ_START})"
+    END_RECORD[${FIELD}]="$(record_name ${FIELD} ${SEQ_END})"
+done
+
 for i in $(seq ${SEQ_START} ${SEQ_END}); do
+    for FIELD in "${FIELDS[@]}"; do
+        RECORD[${FIELD}]="$(record_name ${FIELD} $i)"
+        PRIOR_RECORD[${FIELD}]="$(record_name ${FIELD} $((i - 1)))"
+    done
+
     DAY=$((${SEQ_END} - ${i} + ${SEQ_START}))
     DATE=$(get_date ${DAY})
     TXT_FILE=${DATE}.txt
@@ -112,77 +132,70 @@ for i in $(seq ${SEQ_START} ${SEQ_END}); do
         continue
     fi
 
-    NEW_TOTAL_POSITIVE=$(cat ${TXT_FILE} |grep Confirmed | sed 's/[^0-9]*//g');
-    NEW_TOTAL_TESTS=$(cat ${TXT_FILE} |grep "^ *Total Patients Tested" | awk '{ print $5 }')
-    NEW_TOTAL_DEATHS=$(cat ${TXT_FILE} |grep "^ *Attributed to COVID-19" | awk '{ print $4 }')
-    NEW_DEATH_RANGE=$(cat ${TXT_FILE} | grep "Dates of Death" | awk -F: '{ print $2 }' | sed 's/)//')
+    DATA_STORE[${RECORD['total-positive']}]=$(cat ${TXT_FILE} |grep Confirmed | sed 's/[^0-9]*//g')
+    DATA_STORE[${RECORD['total-tests']}]=$(cat ${TXT_FILE} |grep "^ *Total Patients Tested" | awk '{ print $5 }')
+    DATA_STORE[${RECORD['total-deaths']}]=$(cat ${TXT_FILE} |grep "^ *Attributed to COVID-19" | awk '{ print $4 }')
+    DATA_STORE[${RECORD['death-range']}]=$(cat ${TXT_FILE} | grep "Dates of Death" | awk -F: '{ print $2 }' | sed 's/)//')
 
-    [ -z $NEW_TOTAL_POSITIVE ] && continue;
+    [ -z ${DATA_STORE[${RECORD['total-positive']}]} ] && continue;
 
     # if this is the first time through the loop, we're just trying to get base line stats, not
     # print anything.
     if [ "$i" -lt $((SEQ_START + PREROLL)) ]; then
-        START_TOTAL_POSITIVE=${NEW_TOTAL_POSITIVE}
-        START_TOTAL_TESTS=${NEW_TOTAL_TESTS}
-        START_TOTAL_DEATHS=${NEW_TOTAL_DEATHS}
-        OLD_TOTAL_POSITIVE=${NEW_TOTAL_POSITIVE}
-        OLD_TOTAL_TESTS=${NEW_TOTAL_TESTS}
-        OLD_TOTAL_DEATHS=${NEW_TOTAL_DEATHS}
         continue;
     fi
 
-    echo -ne "$(date -d ${DATE} +'%d %B' ): ${NEW_TOTAL_POSITIVE} people infected"
-    if [ -n "${OLD_TOTAL_POSITIVE}" ]; then
-        echo -ne " ($(print_change 'cases' ${OLD_TOTAL_POSITIVE} ${NEW_TOTAL_POSITIVE}))"
+    echo -ne "$(date -d ${DATE} +'%d %B' ): ${DATA_STORE[${RECORD['total-positive']}]} people infected"
+
+    if [ -n "${DATA_STORE[${PRIOR_RECORD['total-positive']}]}" ]; then
+        echo -ne " ($(print_change 'cases' ${DATA_STORE[${PRIOR_RECORD['total-positive']}]} ${DATA_STORE[${RECORD['total-positive']}]}))"
     fi
 
-    if [ -n "${NEW_TOTAL_TESTS}" ]; then
+    if [ -n "${DATA_STORE[${RECORD['total-positive']}]}" ]; then
 
-        echo -ne ",  ${NEW_TOTAL_TESTS} people tested"
+        echo -ne ", ${DATA_STORE[${RECORD['total-tests']}]} people tested"
 
-        if [ -n "${OLD_TOTAL_TESTS}" ]; then
-            echo -ne " ($(print_change 'tests' ${OLD_TOTAL_TESTS} ${NEW_TOTAL_TESTS}))"
+        if [ -n "${DATA_STORE[${PRIOR_RECORD['total-tests']}]}" ]; then
+            echo -ne " ($(print_change 'tests' ${DATA_STORE[${PRIOR_RECORD['total-tests']}]} ${DATA_STORE[${RECORD['total-tests']}]})"
         fi
 
         echo -ne ","
 
-        PREVALENCE=$(print_percentage ${NEW_TOTAL_TESTS} ${NEW_TOTAL_POSITIVE})
-        POPULATION_PERCENTAGE=$(print_percentage ${POPULATION} ${NEW_TOTAL_TESTS})
+        PREVALENCE=$(print_percentage ${DATA_STORE[${RECORD['total-tests']}]} ${DATA_STORE[${RECORD['total-positive']}]})
+        POPULATION_PERCENTAGE=$(print_percentage ${POPULATION} ${DATA_STORE[${RECORD['total-tests']}]})
         echo -ne " ${PREVALENCE} tested were infected,"
         echo -ne " sampled ${POPULATION_PERCENTAGE} of the population"
     fi
 
-    if [ -n "${NEW_TOTAL_DEATHS}" ]; then
+    if [ -n "${DATA_STORE[${RECORD['total-deaths']}]}" ]; then
         unset NEW_DEATH_RANGE_DAYS
-        if [ -n "${NEW_DEATH_RANGE}" ]; then
-            NEW_DEATH_RANGE_START=$(echo ${NEW_DEATH_RANGE} | awk '{ print $1 }')
-            NEW_DEATH_RANGE_END=$(echo ${NEW_DEATH_RANGE} | awk '{ print $3 }')
+        if [ -n "${DATA_STORE[${RECORD['death-range']}]}" ]; then
+            NEW_DEATH_RANGE_START=$(echo ${DATA_STORE[${RECORD['death-range']}]} | awk '{ print $1 }')
+            NEW_DEATH_RANGE_END=$(echo ${DATA_STORE[${RECORD['death-range']}]} | awk '{ print $3 }')
             NEW_DEATH_RANGE_START_DATE=$(date -d $NEW_DEATH_RANGE_START +%s)
             NEW_DEATH_RANGE_END_DATE=$(date -d $NEW_DEATH_RANGE_END +%s)
-            NEW_DEATH_RANGE_DAYS=$(((NEW_DEATH_RANGE_END_DATE - NEW_DEATH_RANGE_START_DATE) / (60 * 60 * 24)))
+
+            DATA_STORE[${RECORD['death-range-span']}]=$(((NEW_DEATH_RANGE_END_DATE - NEW_DEATH_RANGE_START_DATE) / (60 * 60 * 24)))
         fi
 
-        echo -ne ", ${NEW_TOTAL_DEATHS} people died"
+        echo -ne ", ${DATA_STORE[${RECORD['total-deaths']}]} people died"
 
-        if [ -n "${OLD_TOTAL_DEATHS}" ]; then
-            echo -ne " ($(print_change 'fatalities' ${OLD_TOTAL_DEATHS} ${NEW_TOTAL_DEATHS}))"
+        if [ -n "${DATA_STORE[${PRIOR_RECORD['total-deaths']}]}" ]; then
+            echo -ne " ($(print_change 'fatalities' ${DATA_STORE[${PRIOR_RECORD['total-deaths']}]} ${DATA_STORE[${RECORD['total-deaths']}]})"
         fi
 
-        if [ -n "${NEW_DEATH_RANGE_DAYS}" ]; then
-            echo -ne ", about $(((NEW_TOTAL_DEATHS - OLD_TOTAL_DEATHS) / NEW_DEATH_RANGE_DAYS)) deaths per day over the last ${NEW_DEATH_RANGE_DAYS} days."
+        if [ -n "${DATA_STORE[${RECORD['death-range-span']}]}" ]; then
+            DEATHS_PER_DAY=$(((${DATA_STORE[${RECORD['total-deaths']}]} - ${DATA_STORE[${PRIOR_RECORD['total-deaths']}]}) / ${DATA_STORE[${RECORD['death-range-span']}]}))
+            echo -ne ", about $DEATHS_PER_DAY deaths per day over the last ${DATA_STORE[${RECORD['death-range-span']}]} days."
         fi
     fi
     echo
     echo
-
-    OLD_TOTAL_POSITIVE=${NEW_TOTAL_POSITIVE}
-    OLD_TOTAL_TESTS=${NEW_TOTAL_TESTS}
-    OLD_TOTAL_DEATHS=${NEW_TOTAL_DEATHS}
 done
 
-CASES_PER_DAY=$(((NEW_TOTAL_POSITIVE - START_TOTAL_POSITIVE)/NUM_DAYS))
-TESTS_PER_DAY=$(((NEW_TOTAL_TESTS - START_TOTAL_TESTS)/NUM_DAYS))
-DEATHS_PER_REPORT=$(((NEW_TOTAL_DEATHS - START_TOTAL_DEATHS)/NUM_DAYS))
+CASES_PER_DAY=$(((${DATA_STORE[${END_RECORD['total-positive']}]} - ${DATA_STORE[${START_RECORD['total-positive']}]}) / NUM_DAYS))
+TESTS_PER_DAY=$(((${DATA_STORE[${END_RECORD['total-tests']}]} - ${DATA_STORE[${START_RECORD['total-tests']}]}) / NUM_DAYS))
+DEATHS_PER_REPORT=$(((${DATA_STORE[${END_RECORD['total-deaths']}]} - ${DATA_STORE[${START_RECORD['total-deaths']}]}) / NUM_DAYS))
 
 # FIXME: the deaths per day number here is just looking at the last report and not the $NUM_DAYS worth of reports
 echo -e "Over the last ${NUM_DAYS} days there have been an average of ${CASES_PER_DAY} cases per day, an average of ${TESTS_PER_DAY} tests per day, and an average of ${DEATHS_PER_REPORT} deaths per report (about $((DEATHS_PER_REPORT / NUM_DAYS)) per day)"
