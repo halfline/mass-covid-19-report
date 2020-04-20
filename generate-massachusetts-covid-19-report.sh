@@ -128,7 +128,9 @@ for i in $(seq ${SEQ_START} ${SEQ_END}); do
     TXT_FILE=${DATE}.txt
 
     if [ ! -e ${TXT_FILE} ]; then
-        echo "WARNING: data for ${DATE} is missing" 1>&2
+        if [ ${i} -ne ${SEQ_END} ]; then
+            echo "WARNING: data for ${DATE} is missing" 1>&2
+        fi
         continue
     fi
 
