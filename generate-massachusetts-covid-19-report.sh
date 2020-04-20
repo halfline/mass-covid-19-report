@@ -114,9 +114,9 @@ declare -A RECORD PRIOR_RECORD START_RECORD END_RECORD
 
 for FIELD in "${FIELDS[@]}"; do
     START_RECORD[${FIELD}]="$(record_name ${FIELD} ${SEQ_START})"
-    END_RECORD[${FIELD}]="$(record_name ${FIELD} ${SEQ_END})"
 done
 
+LAST_GOOD_DAY=-1
 for i in $(seq ${SEQ_START} ${SEQ_END}); do
     for FIELD in "${FIELDS[@]}"; do
         RECORD[${FIELD}]="$(record_name ${FIELD} $i)"
@@ -191,14 +191,30 @@ for i in $(seq ${SEQ_START} ${SEQ_END}); do
     fi
     echo
     echo
+
+    LAST_GOOD_DAY=${i}
 done
 
-CASES_PER_DAY=$(((${DATA_STORE[${END_RECORD['total-positive']}]} - ${DATA_STORE[${START_RECORD['total-positive']}]}) / NUM_DAYS))
-TESTS_PER_DAY=$(((${DATA_STORE[${END_RECORD['total-tests']}]} - ${DATA_STORE[${START_RECORD['total-tests']}]}) / NUM_DAYS))
-DEATHS_PER_REPORT=$(((${DATA_STORE[${END_RECORD['total-deaths']}]} - ${DATA_STORE[${START_RECORD['total-deaths']}]}) / NUM_DAYS))
+if [ $LAST_GOOD_DAY -ge $SEQ_START ]; then
+    for FIELD in "${FIELDS[@]}"; do
+        END_RECORD[${FIELD}]="$(record_name ${FIELD} ${LAST_GOOD_DAY})"
+    done
+fi
 
-# FIXME: the deaths per day number here is just looking at the last report and not the $NUM_DAYS worth of reports
-echo -e "Over the last ${NUM_DAYS} days there have been an average of ${CASES_PER_DAY} cases per day, an average of ${TESTS_PER_DAY} tests per day, and an average of ${DEATHS_PER_REPORT} deaths per report (about $((DEATHS_PER_REPORT / NUM_DAYS)) per day)"
+if [ ${#END_RECORD[@]} -gt 0 ]; then
+    DAYS_PROCESSED=$((LAST_GOOD_DAY - SEQ_START))
+    CASES_PER_DAY=$(((${DATA_STORE[${END_RECORD['total-positive']}]} - ${DATA_STORE[${START_RECORD['total-positive']}]}) / DAYS_PROCESSED))
+    TESTS_PER_DAY=$(((${DATA_STORE[${END_RECORD['total-tests']}]} - ${DATA_STORE[${START_RECORD['total-tests']}]}) / DAYS_PROCESSED))
+    DEATHS_PER_REPORT=$(((${DATA_STORE[${END_RECORD['total-deaths']}]} - ${DATA_STORE[${START_RECORD['total-deaths']}]}) / DAYS_PROCESSED))
+
+    # FIXME: the deaths per day number here is just looking at the last report and not the $NUM_DAYS worth of reports
+    if [ $DAYS_PROCESSED -ne $NUM_DAYS ]; then
+        echo -ne "Over the ${DAYS_PROCESSED} days before today"
+    else
+        echo -ne "Over the last ${DAYS_PROCESSED} days (including today)"
+    fi
+    echo -ne " there have been an average of ${CASES_PER_DAY} cases per day, an average of ${TESTS_PER_DAY} tests per day, and an average of ${DEATHS_PER_REPORT} deaths per report (about $((DEATHS_PER_REPORT / DAYS_PROCESSED)) per day)"
+fi
 
 for day in $(seq 1 5); do
     DATE=$(date -d "$day days ago" +%Y-%m-%d)
