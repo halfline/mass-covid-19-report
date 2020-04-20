@@ -59,6 +59,18 @@ record_name()
     echo "${field}-${iteration}"
 }
 
+FIELDS=(total-positive total-tests total-deaths death-range death-range-span)
+
+generate_record_index()
+{
+    declare -n record="$1"; shift
+    index_name="$1"; shift
+
+    for FIELD in "${FIELDS[@]}"; do
+        record[${FIELD}]="$(record_name ${FIELD} ${index_name})"
+    done
+}
+
 SEQ_START=0
 SEQ_END=$((NUM_DAYS - 1 + PREROLL))
 
@@ -107,21 +119,15 @@ for i in $(seq ${SEQ_START} ${SEQ_END}); do
     fi
 done
 
-FIELDS=(total-positive total-tests total-deaths death-range death-range-span)
-
 declare -A DATA_STORE
 declare -A RECORD PRIOR_RECORD START_RECORD END_RECORD
 
-for FIELD in "${FIELDS[@]}"; do
-    START_RECORD[${FIELD}]="$(record_name ${FIELD} ${SEQ_START})"
-done
+generate_record_index START_RECORD ${SEQ_START}
 
 LAST_GOOD_DAY=-1
 for i in $(seq ${SEQ_START} ${SEQ_END}); do
-    for FIELD in "${FIELDS[@]}"; do
-        RECORD[${FIELD}]="$(record_name ${FIELD} $i)"
-        PRIOR_RECORD[${FIELD}]="$(record_name ${FIELD} $((i - 1)))"
-    done
+    generate_record_index RECORD "${i}"
+    generate_record_index PRIOR_RECORD "$((i - 1))"
 
     DAY=$((${SEQ_END} - ${i} + ${SEQ_START}))
     DATE=$(get_date ${DAY})
@@ -198,9 +204,7 @@ for i in $(seq ${SEQ_START} ${SEQ_END}); do
 done
 
 if [ $LAST_GOOD_DAY -ge $SEQ_START ]; then
-    for FIELD in "${FIELDS[@]}"; do
-        END_RECORD[${FIELD}]="$(record_name ${FIELD} ${LAST_GOOD_DAY})"
-    done
+    generate_record_index END_RECORD ${LAST_GOOD_DAY}
 fi
 
 if [ ${#END_RECORD[@]} -gt 0 ]; then
