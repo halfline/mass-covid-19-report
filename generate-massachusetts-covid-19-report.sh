@@ -211,6 +211,7 @@ if [ ${#END_RECORD[@]} -gt 0 ]; then
     DAYS_PROCESSED=$((LAST_GOOD_DAY - SEQ_START))
     CASES_PER_DAY=$(((${DATA_STORE[${END_RECORD['total-positive']}]} - ${DATA_STORE[${START_RECORD['total-positive']}]}) / DAYS_PROCESSED))
     TESTS_PER_DAY=$(((${DATA_STORE[${END_RECORD['total-tests']}]} - ${DATA_STORE[${START_RECORD['total-tests']}]}) / DAYS_PROCESSED))
+    TESTS_PER_100K_PEOPLE=$(((TESTS_PER_DAY * 100000) / ${POPULATION}))
     DEATHS_PER_REPORT=$(((${DATA_STORE[${END_RECORD['total-deaths']}]} - ${DATA_STORE[${START_RECORD['total-deaths']}]}) / DAYS_PROCESSED))
 
     # FIXME: the deaths per day number here is just looking at the last report and not the $NUM_DAYS worth of reports
@@ -219,7 +220,7 @@ if [ ${#END_RECORD[@]} -gt 0 ]; then
     else
         echo -ne "Over the last ${DAYS_PROCESSED} days (including today)"
     fi
-    echo -ne " there have been an average of ${CASES_PER_DAY} cases per day, an average of ${TESTS_PER_DAY} tests per day, and an average of ${DEATHS_PER_REPORT} deaths per report (about $((DEATHS_PER_REPORT / DAYS_PROCESSED)) per day)"
+    echo -ne " there have been an average of ${CASES_PER_DAY} cases per day, an average of ${TESTS_PER_DAY} tests per day (${TESTS_PER_100K_PEOPLE} tests for every 100,000 people, needs to be greater than 152 to be adequate), and an average of ${DEATHS_PER_REPORT} deaths per report (about $((DEATHS_PER_REPORT / DAYS_PROCESSED)) per day)"
 fi
 
 for day in $(seq 1 5); do
