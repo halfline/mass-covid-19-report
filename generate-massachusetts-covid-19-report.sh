@@ -125,6 +125,8 @@ declare -A RECORD PRIOR_RECORD START_RECORD END_RECORD
 generate_record_index START_RECORD ${SEQ_START}
 
 LAST_GOOD_DAY=-1
+TOTAL_DEATHS_PER_DAY=0
+TOTAL_DEATH_RANGE_DAYS=0
 for i in $(seq ${SEQ_START} ${SEQ_END}); do
     generate_record_index RECORD "${i}"
     generate_record_index PRIOR_RECORD "$((i - 1))"
@@ -195,6 +197,8 @@ for i in $(seq ${SEQ_START} ${SEQ_END}); do
         if [ -n "${DATA_STORE[${RECORD['death-range-span']}]}" ]; then
             DEATHS_PER_DAY=$(((${DATA_STORE[${RECORD['total-deaths']}]} - ${DATA_STORE[${PRIOR_RECORD['total-deaths']}]}) / ${DATA_STORE[${RECORD['death-range-span']}]}))
             echo -ne ", about $DEATHS_PER_DAY deaths per day over the last ${DATA_STORE[${RECORD['death-range-span']}]} days."
+            TOTAL_DEATHS_PER_DAY=$((TOTAL_DEATHS_PER_DAY + DEATHS_PER_DAY))
+            TOTAL_DEATH_RANGE_DAYS=$((TOTAL_DEATH_RANGE_DAYS + ${DATA_STORE[${RECORD['death-range-span']}]}))
         fi
     fi
     echo
@@ -214,13 +218,12 @@ if [ ${#END_RECORD[@]} -gt 0 ]; then
     TESTS_PER_100K_PEOPLE=$(((TESTS_PER_DAY * 100000) / ${POPULATION}))
     DEATHS_PER_REPORT=$(((${DATA_STORE[${END_RECORD['total-deaths']}]} - ${DATA_STORE[${START_RECORD['total-deaths']}]}) / DAYS_PROCESSED))
 
-    # FIXME: the deaths per day number here is just looking at the last report and not the $NUM_DAYS worth of reports
     if [ $DAYS_PROCESSED -ne $NUM_DAYS ]; then
         echo -ne "Over the ${DAYS_PROCESSED} days before today"
     else
         echo -ne "Over the last ${DAYS_PROCESSED} days (including today)"
     fi
-    echo -ne " there have been an average of ${CASES_PER_DAY} cases per day, an average of ${TESTS_PER_DAY} tests per day (${TESTS_PER_100K_PEOPLE} tests for every 100,000 people, needs to be greater than 152 to be adequate), and an average of ${DEATHS_PER_REPORT} deaths per report (about $((DEATHS_PER_REPORT / DAYS_PROCESSED)) per day)"
+    echo -ne " there have been an average of ${CASES_PER_DAY} cases per day, an average of ${TESTS_PER_DAY} tests per day (${TESTS_PER_100K_PEOPLE} tests for every 100,000 people, needs to be greater than 152 to be adequate), and an average of ${DEATHS_PER_REPORT} deaths per report (about $((TOTAL_DEATHS_PER_DAY / DAYS_PROCESSED)) per day, over an average span of $((TOTAL_DEATH_RANGE_DAYS / DAYS_PROCESSED)) days)"
 fi
 
 for day in $(seq 1 5); do
