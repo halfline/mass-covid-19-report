@@ -77,6 +77,9 @@ SEQ_END=$((NUM_DAYS - 1 + PREROLL))
 for i in $(seq ${SEQ_START} ${SEQ_END}); do
     DATE=$(get_date ${i})
     PDF_FILE=${DATE}.pdf
+
+    [ ! -e ${PDF_FILE} ] && curl -s https://www.mass.gov/doc/covid-19-dashboard-${DATE}/download > ${PDF_FILE}
+
     [ ! -e ${PDF_FILE} ] && curl -s https://www.mass.gov/doc/covid-19-cases-in-massachusetts-as-of-${DATE}/download > ${PDF_FILE}
 
     [ ! -e ${PDF_FILE} ] && curl -s https://www.mass.gov/doc/covid-19-cases-in-massachusetts-as-of-${DATA}-x-updated4pm/download > ${PDF_FILE}
@@ -142,10 +145,19 @@ for i in $(seq ${SEQ_START} ${SEQ_END}); do
         continue
     fi
 
-    DATA_STORE[${RECORD['total-positive']}]=$(cat ${TXT_FILE} |grep Confirmed | sed 's/[^0-9]*//g')
-    DATA_STORE[${RECORD['total-tests']}]=$(cat ${TXT_FILE} |grep "^ *Total Patients Tested" | awk '{ print $5 }')
-    DATA_STORE[${RECORD['total-deaths']}]=$(cat ${TXT_FILE} |grep "^ *Attributed to COVID-19" | awk '{ print $4 }')
-    DATA_STORE[${RECORD['death-range']}]=$(cat ${TXT_FILE} | grep "Dates of Death" | awk -F: '{ print $2 }' | sed 's/)//')
+    ALL_STATS_LINE=$(cat ${TXT_FILE} | tr -d ',' | sed -n -e 's/^ *\([0-9]\+\) *\([0-9]\+\) *\([0-9]\+\) *\([0-9]\+ *%\) *\([0-9]\+\) *\([0-9]\+\) */\1 \2 \3 \4 \5 \6/p' | tr -d '%')
+
+    if [ -n "${ALL_STATS_LINE}" ]; then
+        DATA_STORE[${RECORD['total-positive']}]=$(echo ${ALL_STATS_LINE} | awk '{ print $2 }')
+        DATA_STORE[${RECORD['total-tests']}]=$(echo ${ALL_STATS_LINE} | awk '{ print $1 }')
+        DATA_STORE[${RECORD['total-deaths']}]=$(echo ${ALL_STATS_LINE} | awk '{ print $5 }')
+        DATA_STORE[${RECORD['death-range']}]=""
+    else
+        DATA_STORE[${RECORD['total-positive']}]=$(cat ${TXT_FILE} |grep Confirmed | sed 's/[^0-9]*//g')
+        DATA_STORE[${RECORD['total-tests']}]=$(cat ${TXT_FILE} |grep "^ *Total Patients Tested" | awk '{ print $5 }')
+        DATA_STORE[${RECORD['total-deaths']}]=$(cat ${TXT_FILE} |grep "^ *Attributed to COVID-19" | awk '{ print $4 }')
+        DATA_STORE[${RECORD['death-range']}]=$(cat ${TXT_FILE} | grep "Dates of Death" | awk -F: '{ print $2 }' | sed 's/)//')
+    fi
 
     [ -z ${DATA_STORE[${RECORD['total-positive']}]} ] && continue;
 
