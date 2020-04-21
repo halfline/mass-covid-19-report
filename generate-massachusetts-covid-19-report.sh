@@ -181,7 +181,7 @@ for i in $(seq ${SEQ_START} ${SEQ_END}); do
         echo -ne ", ${DATA_STORE[${RECORD['total-deaths']}]} people died"
 
         if [ -n "${DATA_STORE[${PRIOR_RECORD['total-deaths']}]}" ]; then
-            echo -ne " ($(print_change 'fatalities' ${DATA_STORE[${PRIOR_RECORD['total-deaths']}]} ${DATA_STORE[${RECORD['total-deaths']}]})"
+            echo -ne " ($(print_change 'fatalities' ${DATA_STORE[${PRIOR_RECORD['total-deaths']}]} ${DATA_STORE[${RECORD['total-deaths']}]}))"
         fi
 
         if [ -n "${DATA_STORE[${RECORD['death-range-span']}]}" ]; then
